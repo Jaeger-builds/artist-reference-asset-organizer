@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+artist_reference_asset_organizer.db
+Sorted Output/
+.DS_Store
