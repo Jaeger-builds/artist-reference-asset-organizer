@@ -316,7 +316,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_NAME)
-        self.geometry("1180x760")
+        self.geometry("1240x790")
+        self.minsize(1040, 690)
 
         self.project_dir = Path.cwd()
         self.db = Database(self.project_dir / DB_FILE)
@@ -326,91 +327,311 @@ class App(tk.Tk):
         self.output_folder = tk.StringVar()
         self.mode = tk.StringVar(value="copy")
         self.confidence_threshold = tk.DoubleVar(value=0.26)
+        self.threshold_display = tk.StringVar(value="0.26")
         self.status_text = tk.StringVar(value="Ready. Load the model, choose folders, then scan.")
 
         self.results: List[ClassificationResult] = []
         self.embedding_cache: Dict[str, np.ndarray] = {}
         self.selected_preview: Optional[ImageTk.PhotoImage] = None
 
+        self._configure_style()
         self._build_ui()
 
+    def _configure_style(self):
+        self.colors = {
+            "ink": "#f3f1ec",
+            "muted": "#a7a3ae",
+            "line": "#34333c",
+            "outline": "#000000",
+            "paper": "#2b2a33",
+            "surface": "#36343e",
+            "workspace": "#1f1e25",
+            "selected": "#41404a",
+            "scale_thumb": "#000000",
+            "primary": "#16151b",
+            "grid": "#302f38",
+        }
+        self.configure(background=self.colors["workspace"])
+
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure(".", font=("Segoe UI", 9), background=self.colors["paper"], foreground=self.colors["ink"])
+        style.configure("Sidebar.TFrame", background=self.colors["paper"])
+        style.configure("Workspace.TFrame", background=self.colors["workspace"])
+        style.configure(
+            "Card.TFrame",
+            background=self.colors["paper"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            relief="solid",
+            borderwidth=1,
+        )
+        style.configure("Title.TLabel", background=self.colors["paper"], font=("Segoe UI Semibold", 12))
+        style.configure(
+            "Section.TLabel",
+            background=self.colors["paper"],
+            foreground=self.colors["muted"],
+            font=("Segoe UI Semibold", 8),
+        )
+        style.configure("Body.TLabel", background=self.colors["paper"], font=("Segoe UI", 9))
+        style.configure("Muted.TLabel", background=self.colors["paper"], foreground=self.colors["muted"], font=("Segoe UI", 8))
+        style.configure("CardTitle.TLabel", background=self.colors["paper"], font=("Segoe UI Semibold", 11))
+        style.configure("WorkspaceTitle.TLabel", background=self.colors["workspace"], font=("Segoe UI Semibold", 13))
+        style.configure("Status.TLabel", background=self.colors["paper"], foreground=self.colors["muted"], wraplength=270)
+        style.configure(
+            "TEntry",
+            fieldbackground=self.colors["paper"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            padding=(8, 7),
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground=self.colors["paper"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            padding=(7, 6),
+        )
+        style.map("TCombobox", fieldbackground=[("readonly", self.colors["paper"])])
+        style.configure(
+            "TButton",
+            background=self.colors["paper"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            padding=(12, 8),
+            relief="solid",
+        )
+        style.map("TButton", background=[("active", self.colors["surface"])])
+        style.configure(
+            "Primary.TButton",
+            background=self.colors["primary"],
+            foreground=self.colors["ink"],
+            bordercolor=self.colors["primary"],
+            padding=(12, 9),
+        )
+        style.map(
+            "Primary.TButton",
+            background=[("active", self.colors["workspace"]), ("pressed", self.colors["primary"])],
+            foreground=[("active", self.colors["ink"])],
+        )
+        style.configure("Small.TButton", font=("Segoe UI Semibold", 8), padding=(8, 7))
+        style.configure(
+            "Segment.TRadiobutton",
+            background=self.colors["paper"],
+            foreground=self.colors["ink"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            borderwidth=1,
+            padding=(20, 8),
+            relief="solid",
+        )
+        style.layout(
+            "Segment.TRadiobutton",
+            [
+                (
+                    "Button.border",
+                    {
+                        "sticky": "nswe",
+                        "children": [
+                            (
+                                "Radiobutton.padding",
+                                {"sticky": "nswe", "children": [("Radiobutton.label", {"sticky": "nswe"})]},
+                            )
+                        ],
+                    },
+                )
+            ],
+        )
+        style.map(
+            "Segment.TRadiobutton",
+            background=[("selected", self.colors["primary"]), ("active", self.colors["surface"])],
+            foreground=[("selected", self.colors["ink"])],
+            bordercolor=[("selected", self.colors["line"])],
+        )
+        style.configure(
+            "Strictness.Horizontal.TScale",
+            background=self.colors["scale_thumb"],
+            troughcolor=self.colors["line"],
+            bordercolor=self.colors["scale_thumb"],
+            lightcolor=self.colors["scale_thumb"],
+            darkcolor=self.colors["scale_thumb"],
+        )
+        style.map("Strictness.Horizontal.TScale", background=[("active", self.colors["scale_thumb"])])
+        style.configure(
+            "Treeview",
+            background=self.colors["paper"],
+            fieldbackground=self.colors["paper"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            borderwidth=1,
+            relief="solid",
+            rowheight=31,
+            font=("Segoe UI", 9),
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=self.colors["surface"],
+            foreground=self.colors["muted"],
+            bordercolor=self.colors["line"],
+            lightcolor=self.colors["line"],
+            darkcolor=self.colors["line"],
+            font=("Segoe UI Semibold", 8),
+            padding=(8, 9),
+        )
+        style.map("Treeview", background=[("selected", self.colors["selected"])], foreground=[("selected", self.colors["ink"])])
+
+    def _sidebar_section(self, parent: ttk.Frame, title: str) -> ttk.Frame:
+        tk.Frame(parent, height=1, background=self.colors["outline"], borderwidth=0, highlightthickness=0).pack(fill="x")
+        section = ttk.Frame(parent, style="Sidebar.TFrame", padding=(20, 13, 20, 15))
+        section.pack(fill="x")
+        ttk.Label(section, text=title.upper(), style="Section.TLabel").pack(anchor="w", pady=(0, 11))
+        return section
+
+    def _folder_field(self, parent: ttk.Frame, label: str, variable: tk.StringVar, command):
+        ttk.Label(parent, text=label.upper(), style="Muted.TLabel").pack(anchor="w", pady=(0, 4))
+        row = ttk.Frame(parent, style="Sidebar.TFrame")
+        row.pack(fill="x", pady=(0, 10))
+        ttk.Entry(row, textvariable=variable).pack(side="left", fill="x", expand=True)
+        ttk.Button(row, text="...", command=command, style="Small.TButton", width=3).pack(side="left", padx=(5, 0))
+
     def _build_ui(self):
-        top = ttk.Frame(self, padding=10)
-        top.pack(fill="x")
+        shell = ttk.Frame(self, style="Workspace.TFrame")
+        shell.pack(fill="both", expand=True)
 
-        ttk.Label(top, text="Input Folder").grid(row=0, column=0, sticky="w")
-        ttk.Entry(top, textvariable=self.input_folder, width=75).grid(row=0, column=1, sticky="we", padx=6)
-        ttk.Button(top, text="Browse", command=self.browse_input).grid(row=0, column=2)
+        sidebar = ttk.Frame(shell, style="Sidebar.TFrame", width=322)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
 
-        ttk.Label(top, text="Output Folder").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(top, textvariable=self.output_folder, width=75).grid(row=1, column=1, sticky="we", padx=6, pady=(6, 0))
-        ttk.Button(top, text="Browse", command=self.browse_output).grid(row=1, column=2, pady=(6, 0))
+        header = ttk.Frame(sidebar, style="Sidebar.TFrame", padding=(20, 14, 20, 13))
+        header.pack(fill="x")
+        ttk.Label(header, text="REFERENCE SORTER", style="Title.TLabel").pack(side="left")
 
-        controls = ttk.Frame(self, padding=(10, 0, 10, 10))
-        controls.pack(fill="x")
+        folders = self._sidebar_section(sidebar, "Folders")
+        self._folder_field(folders, "Input", self.input_folder, self.browse_input)
+        self._folder_field(folders, "Output", self.output_folder, self.browse_output)
 
-        ttk.Button(controls, text="Load AI Model", command=self.load_model_thread).pack(side="left", padx=(0, 8))
-        ttk.Button(controls, text="Scan and Sort", command=self.scan_thread).pack(side="left", padx=(0, 8))
+        actions = self._sidebar_section(sidebar, "Actions")
+        action_buttons = ttk.Frame(actions, style="Sidebar.TFrame")
+        action_buttons.pack(fill="x", pady=(0, 13))
+        ttk.Button(action_buttons, text="LOAD MODEL", command=self.load_model_thread).pack(side="left", fill="x", expand=True)
+        ttk.Button(action_buttons, text="SCAN + SORT", command=self.scan_thread, style="Primary.TButton").pack(
+            side="left", fill="x", expand=True, padx=(6, 0)
+        )
+        ttk.Label(actions, text="FILE MODE", style="Muted.TLabel").pack(anchor="w", pady=(0, 5))
+        mode_row = ttk.Frame(actions, style="Sidebar.TFrame")
+        mode_row.pack(fill="x")
+        ttk.Radiobutton(mode_row, text="Copy", value="copy", variable=self.mode, style="Segment.TRadiobutton").pack(
+            side="left", fill="x", expand=True
+        )
+        ttk.Radiobutton(mode_row, text="Move", value="move", variable=self.mode, style="Segment.TRadiobutton").pack(
+            side="left", fill="x", expand=True
+        )
 
-        ttk.Label(controls, text="Mode").pack(side="left", padx=(12, 4))
-        ttk.Combobox(controls, textvariable=self.mode, values=["copy", "move"], width=8, state="readonly").pack(side="left")
-
-        ttk.Label(controls, text="Sorting Strictness").pack(side="left", padx=(12, 4))
+        sort = self._sidebar_section(sidebar, "Sorting")
+        threshold_row = ttk.Frame(sort, style="Sidebar.TFrame")
+        threshold_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(threshold_row, text="STRICTNESS", style="Muted.TLabel").pack(side="left")
+        ttk.Label(threshold_row, textvariable=self.threshold_display, style="Body.TLabel").pack(side="right")
         ttk.Scale(
-            controls,
+            sort,
             from_=0.15,
             to=0.40,
             variable=self.confidence_threshold,
             orient="horizontal",
-            length=180,
-        ).pack(side="left")
-        ttk.Label(controls, text="Right = more strict").pack(side="left", padx=(6, 0))
+            command=self._update_threshold_label,
+            style="Strictness.Horizontal.TScale",
+        ).pack(fill="x", pady=(0, 7))
+        ttk.Label(sort, text="Higher values send uncertain files to review.", style="Muted.TLabel").pack(anchor="w")
 
-        ttk.Label(controls, textvariable=self.status_text).pack(side="left", padx=(20, 0))
+        status = self._sidebar_section(sidebar, "Status")
+        ttk.Label(status, textvariable=self.status_text, style="Status.TLabel", justify="left").pack(anchor="w")
 
-        main = ttk.Panedwindow(self, orient="horizontal")
-        main.pack(fill="both", expand=True, padx=10, pady=10)
+        workspace = ttk.Frame(shell, style="Workspace.TFrame")
+        workspace.pack(side="left", fill="both", expand=True)
+        self.workspace_canvas = tk.Canvas(workspace, background=self.colors["workspace"], highlightthickness=0)
+        self.workspace_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        self.workspace_canvas.bind("<Configure>", self._draw_workspace_grid)
 
-        left = ttk.Frame(main)
-        right = ttk.Frame(main, width=360)
-        main.add(left, weight=4)
-        main.add(right, weight=1)
+        work_header = ttk.Frame(workspace, style="Workspace.TFrame", padding=(28, 20, 28, 16))
+        work_header.pack(fill="x")
+        ttk.Label(work_header, text="SORTED REFERENCES", style="WorkspaceTitle.TLabel").pack(side="left")
+
+        results_card = ttk.Frame(workspace, style="Card.TFrame", padding=(15, 12, 15, 15))
+        results_card.pack(fill="both", expand=True, padx=(28, 16))
+        ttk.Label(results_card, text="Results", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 10))
 
         columns = ("file", "predicted", "final", "confidence", "feedback", "destination")
-        self.tree = ttk.Treeview(left, columns=columns, show="headings", height=24)
+        table = ttk.Frame(results_card, style="Sidebar.TFrame")
+        table.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(table, columns=columns, show="headings", height=14)
         for col in columns:
-            self.tree.heading(col, text=col.title())
-        self.tree.column("file", width=260)
-        self.tree.column("predicted", width=160)
-        self.tree.column("final", width=160)
-        self.tree.column("confidence", width=90)
-        self.tree.column("feedback", width=90)
-        self.tree.column("destination", width=360)
-        self.tree.pack(fill="both", expand=True)
+            self.tree.heading(col, text=col.upper())
+        self.tree.column("file", width=210)
+        self.tree.column("predicted", width=130)
+        self.tree.column("final", width=130)
+        self.tree.column("confidence", width=88)
+        self.tree.column("feedback", width=80)
+        self.tree.column("destination", width=260)
+        tree_scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        tree_scroll.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
-        ttk.Label(right, text="Preview").pack(anchor="w")
-        self.preview_label = ttk.Label(right)
-        self.preview_label.pack(fill="both", expand=False, pady=(6, 12))
+        detail_card = ttk.Frame(workspace, style="Card.TFrame", padding=(15, 12, 15, 15))
+        detail_card.pack(fill="x", padx=28, pady=(16, 24))
+        preview = ttk.Frame(detail_card, style="Sidebar.TFrame", width=196, height=146)
+        preview.pack(side="left", fill="y", padx=(0, 18))
+        preview.pack_propagate(False)
+        ttk.Label(preview, text="PREVIEW", style="Section.TLabel").pack(anchor="w", pady=(0, 7))
+        self.preview_label = ttk.Label(preview, text="Select a result", anchor="center", style="Muted.TLabel")
+        self.preview_label.pack(fill="both", expand=True)
 
-        ttk.Label(right, text="Correct Category").pack(anchor="w")
+        correction = ttk.Frame(detail_card, style="Sidebar.TFrame")
+        correction.pack(side="left", fill="both", expand=True)
+        ttk.Label(correction, text="CORRECTION", style="Section.TLabel").pack(anchor="w", pady=(0, 7))
+        ttk.Label(correction, text="Correct Category", style="Body.TLabel").pack(anchor="w")
         self.correct_category = tk.StringVar(value="Hands")
         ttk.Combobox(
-            right,
+            correction,
             textvariable=self.correct_category,
             values=list(CATEGORIES.keys()) + [NEEDS_REVIEW],
             state="readonly",
-            width=34,
-        ).pack(anchor="w", pady=(4, 8))
+            width=30,
+        ).pack(anchor="w", pady=(5, 10))
 
-        ttk.Button(right, text="Save Correction", command=self.save_selected_correction).pack(anchor="w", pady=(0, 12))
+        ttk.Button(correction, text="SAVE CORRECTION", command=self.save_selected_correction, style="Primary.TButton").pack(
+            anchor="w"
+        )
 
         explanation = (
             "Corrections are saved locally.\n"
-            "Future scans compare new images against examples you have already fixed.\n"
-            "The more you correct, the better the sorter can match your library."
+            "Future scans compare images against examples you have fixed."
         )
-        ttk.Label(right, text=explanation, wraplength=330, justify="left").pack(anchor="w")
+        ttk.Label(correction, text=explanation, style="Muted.TLabel", justify="left").pack(anchor="w", pady=(10, 0))
+
+    def _draw_workspace_grid(self, event):
+        self.workspace_canvas.delete("grid")
+        for x in range(18, event.width, 24):
+            for y in range(18, event.height, 24):
+                self.workspace_canvas.create_oval(
+                    x,
+                    y,
+                    x + 1,
+                    y + 1,
+                    fill=self.colors["grid"],
+                    outline=self.colors["grid"],
+                    tags="grid",
+                )
+
+    def _update_threshold_label(self, _value=None):
+        self.threshold_display.set(f"{self.confidence_threshold.get():.2f}")
 
     def browse_input(self):
         folder = filedialog.askdirectory(title="Choose input folder")
@@ -537,9 +758,9 @@ class App(tk.Tk):
 
         try:
             img = Image.open(path).convert("RGB")
-            img.thumbnail((330, 330))
+            img.thumbnail((184, 108))
             self.selected_preview = ImageTk.PhotoImage(img)
-            self.preview_label.configure(image=self.selected_preview)
+            self.preview_label.configure(image=self.selected_preview, text="")
             self.correct_category.set(result.final_category)
         except Exception:
             self.preview_label.configure(image="", text="Preview unavailable")
